@@ -123,16 +123,50 @@ public class MainActivity extends AppCompatActivity {
     @SuppressLint("MissingPermission")
     void startLocationUpdates() {
         if (permissionsGranted) {
-            LocationRequest request = new LocationRequest.Builder(3000)
+            LocationRequest locationRequest = new LocationRequest.Builder(3000)
                     .setIntervalMillis(3000)
                     .setMinUpdateIntervalMillis(1000)
                     .setGranularity(Granularity.GRANULARITY_FINE)
                     .setPriority(Priority.PRIORITY_HIGH_ACCURACY)
                     .build();
 
-            fusedLocationClient.requestLocationUpdates(request,
-                    locationCallback,
-                    Looper.getMainLooper());
+            LocationSettingsRequest.Builder builder = new LocationSettingsRequest.Builder()
+                    .addLocationRequest(locationRequest);
+
+            SettingsClient client = LocationServices.getSettingsClient(this);
+            Task<LocationSettingsResponse> task = client.checkLocationSettings(builder.build());
+
+            task.addOnSuccessListener(this, new OnSuccessListener<LocationSettingsResponse>() {
+                @Override
+                public void onSuccess(LocationSettingsResponse locationSettingsResponse) {
+                    fusedLocationClient.requestLocationUpdates(locationRequest,
+                            locationCallback,
+                            Looper.getMainLooper());
+                }
+            });
+
+            task.addOnFailureListener(this, new OnFailureListener() {
+                @Override
+                public void onFailure(@NonNull Exception e) {
+                    if (e instanceof ResolvableApiException) {
+                        // Location settings are not satisfied, but this can be fixed
+                        // by showing the user a dialog.
+                        try {
+                            // Show the dialog by calling startResolutionForResult(),
+                            // and check the result in onActivityResult().
+                            ResolvableApiException resolvable = (ResolvableApiException) e;
+                            resolvable.startResolutionForResult(MainActivity.this,
+                                    1);
+                        } catch (IntentSender.SendIntentException sendEx) {
+                            // Ignore the error.
+                        }
+                    }
+                }
+            });
+
+
+
+
         } else {
             askForPermissions();
         }
